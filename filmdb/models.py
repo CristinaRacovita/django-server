@@ -24,7 +24,7 @@ class User(models.Model):
     age = models.IntegerField
     occupation = models.CharField(max_length=30)
     username = models.CharField(max_length=30)
-    password = models.CharField(max_length=30)
+    password = models.CharField(max_length=100)
 
     class Meta:
         db_table = 'User'
