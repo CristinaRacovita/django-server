@@ -56,5 +56,5 @@ class TrainData(models.Model):
     rating = models.FloatField
 
     class Meta:
-        db_table = 'TrainData'
+        db_table = 'traindata'
         unique_together = (('movie_id', 'user_id'),)
