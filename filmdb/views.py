@@ -44,15 +44,11 @@ def train_data(request):
         return JsonResponse(train_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
 
 
-@api_view(['GET'])
+@api_view(['GET','POST'])
 def get_movies(request):
     if request.method == 'GET':
         movie_serializer = MovieSerializer(Movie.objects.all(), many=True)
         return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
-
-
-@api_view(['POST'])
-def post_movies(request):
     if request.method == 'POST':
         movies = JSONParser().parse(request)
         movie_serializer = MovieSerializer(data=movies, many=True)
