@@ -10,9 +10,11 @@ class Genre(models.Model):
 
 
 class Movie(models.Model):
-    movie_id = models.AutoField(primary_key=True)
-    movie_title = models.CharField(max_length=50)
+    movie_id = models.IntegerField(primary_key=True)
+    movie_title = models.CharField(max_length=150)
     release_date = models.CharField(max_length=30)
+    image_url = models.CharField(max_length=250, null=True)
+    description = models.CharField(max_length=1000, null=True)
 
     class Meta:
         db_table = 'Movie'
@@ -42,7 +44,7 @@ class Rating(models.Model):
     rating_id = models.AutoField(primary_key=True)
     movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
-    rating = models.FloatField
+    rating = models.FloatField()
 
     class Meta:
         db_table = 'Rating'
@@ -52,9 +54,20 @@ class Rating(models.Model):
 class TrainData(models.Model):
     rating_id = models.AutoField(primary_key=True)
     movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
-    user_id = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
-    rating = models.FloatField
+    user_id = models.IntegerField()
+    rating = models.IntegerField()
 
     class Meta:
-        db_table = 'traindata'
+        db_table = 'TrainData'
+        unique_together = (('movie_id', 'user_id'),)
+
+
+class Prediction(models.Model):
+    prediction_id = models.AutoField(primary_key=True)
+    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    user_id = models.IntegerField()
+    rating = models.IntegerField()
+
+    class Meta:
+        db_table = 'Prediction'
         unique_together = (('movie_id', 'user_id'),)
