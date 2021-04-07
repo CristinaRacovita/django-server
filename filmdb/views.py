@@ -9,13 +9,15 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser
 from scipy.sparse import csr_matrix
-from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
-from .models import User, TrainData, Movie, Prediction
-from .serializers import UserSerializer, TrainDataSerializer, MovieSerializer
+
 from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
+from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
+from .models import User, TrainData, Movie, Prediction, Rating, RatingMovieUser
+from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
+    RatingSerializer, UserSerializer
 
 
-@api_view(['GET', 'POST', 'DELETE'])
+@api_view(['GET', 'POST'])
 def credentials_list(request):
     if request.method == 'GET':
         users_serializer = UserSerializer(User.objects.all(), many=True)
@@ -44,14 +46,14 @@ def train_data(request):
         return JsonResponse(train_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
 
 
-@api_view(['GET','POST'])
+@api_view(['GET', 'POST'])
 def get_movies(request):
     if request.method == 'GET':
-        movie_serializer = MovieSerializer(Movie.objects.all(), many=True)
+        movie_serializer = DisplayMovieSerializer(Movie.objects.all(), many=True)
         return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
     if request.method == 'POST':
         movies = JSONParser().parse(request)
-        movie_serializer = MovieSerializer(data=movies, many=True)
+        movie_serializer = DisplayMovieSerializer(data=movies, many=True)
         if movie_serializer.is_valid():
             movie_serializer.save()
             return JsonResponse(movie_serializer.data, status=status.HTTP_201_CREATED, safe=False)
@@ -60,27 +62,43 @@ def get_movies(request):
 
 @api_view(['GET'])
 def get_prediction(request, pk):
+    user_movie = RatingMovieUser.objects.filter(user_id=int(pk))
+
     training_data = TrainData.objects.all()
     res = []
     for i in training_data:
         res.append(model_to_dict(i))
 
+    max_user_id = training_data.order_by('-user_id').first()
+    # print(max_user_id.user_id)
+
+    new_user_id = max_user_id.user_id + 1
+    # print("dsadsadsadsa")
+    # print(len(user_movie))
+
+    j = 1000000
+    for i in user_movie:
+        train_data_obj = TrainData(user_id=new_user_id, movie_id=i.movie_id, rating=int(i.rating), rating_id=j + 1)
+        res.append(model_to_dict(train_data_obj))
+
+    # print(new_user_id)
+
     my_training_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id', 'rating'])
     my_training_data = my_training_data.drop(columns=['rating_id'])
-
-    # my_training_data.user_id = my_training_data.user_id.astype('int')
-    # print(my_training_data)
     sparse_train_data = csr_matrix((my_training_data.rating.values, (my_training_data.user_id.values,
                                                                      my_training_data.movie_id.values)))
     # print(sparse_train_data)
-    most_similar_user_id = get_most_similar_user(pk, sparse_train_data)
+
+    most_similar_user_id = get_most_similar_user(new_user_id, sparse_train_data)
+    # print(most_similar_user_id)
     predictions = Prediction.objects.filter(user_id=most_similar_user_id)
-    max_movie = predictions.order_by('-rating').first()
+    # print("dsadsadaALALAL")
+    max_prediction = predictions.order_by('-rating').first()
 
-    # movie = Movie.objects.get(pk=max_movie.movie_id)
-
-    # print(max_movie.movie_id.movie_title)
-    return JsonResponse(max_movie.movie_id.movie_title, status=status.HTTP_201_CREATED,
+    # movie = Movie.objects.get(pk=max_prediction.movie_id)
+    # best_movie = DetailsMovieSerializer(data=max_prediction.movie_id)
+    # print(max_prediction.movie_id.movie_title)
+    return JsonResponse(max_prediction.movie_id.movie_title, status=status.HTTP_200_OK,
                         safe=False)
 
 
@@ -138,12 +156,48 @@ def get_predictions(request):
 
 @api_view(['PUT'])
 def update_image_url_and_description_for_movies(request):
-    movies = Movie.objects.all()
-    for movie in movies:
-        if movie.movie_id != 243:
-            image_url, synopsis = get_image_url_and_synopsis_by_title(movie.movie_title)
-            movie.image_url = image_url
-            movie.description = synopsis
+    if request.method == 'PUT':
+        movies = Movie.objects.all()
+        for movie in movies:
+            if movie.movie_id != 243:
+                image_url, synopsis = get_image_url_and_synopsis_by_title(movie.movie_title)
+                movie.image_url = image_url
+                movie.description = synopsis
 
-        movie.save()
-    return JsonResponse("Done.", status=status.HTTP_201_CREATED, safe=False)
+            movie.save()
+        return JsonResponse("Done.", status=status.HTTP_201_CREATED, safe=False)
+
+
+@api_view(['GET'])
+def get_movies_details(request, ids):
+    if request.method == 'GET':
+        ids_str_arr = ids.split("-")
+
+        ids_arr = []
+        for movie_id in ids_str_arr:
+            if movie_id != '':
+                try:
+                    int_id = int(movie_id)
+                    ids_arr.append(int_id)
+                except ValueError:
+                    return JsonResponse("Not a int", status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+        movies = []
+        for movie_id in ids_arr:
+            movie = Movie.objects.get(movie_id=movie_id)
+            movies.append(movie)
+
+        movie_serializer = DetailsMovieSerializer(movies, many=True)
+
+        return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
+
+
+@api_view(['POST'])
+def rate_movies(request):
+    if request.method == 'POST':
+        ratings = JSONParser().parse(request)
+        rating_serializer = RatingSerializer(data=ratings, many=True)
+        if rating_serializer.is_valid():
+            rating_serializer.save()
+            return JsonResponse(rating_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+        return JsonResponse(rating_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)

@@ -11,10 +11,11 @@ def build_sparse_tensor(np_array, indices, shape):
         dense_shape=[shape[0], shape[1]])
 
 
-def get_most_similar_user(user_id, train_sparse_matrix):
-    int_id = int(user_id)
-    user_similarity = np.argsort(cosine_similarity(train_sparse_matrix[int_id], train_sparse_matrix).ravel())
+def get_most_similar_user(pk, train_sparse_matrix):
+    user_similarity = np.argsort(cosine_similarity(train_sparse_matrix[pk], train_sparse_matrix).ravel())
+    print("dsadsadsa")
     length_sim = user_similarity.size
+    print("dsadsadsa123456")
     return user_similarity[length_sim - 2]
 
 
