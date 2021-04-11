@@ -12,9 +12,9 @@ from scipy.sparse import csr_matrix
 
 from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
 from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
-from .models import User, TrainData, Movie, Prediction, Rating, RatingMovieUser
+from .models import User, TrainData, Movie, Prediction, RatingMovieUser
 from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
-    RatingSerializer, UserSerializer
+    RatingSerializer, UserSerializer, MovieSerializer
 
 
 @api_view(['GET', 'POST'])
@@ -70,36 +70,34 @@ def get_prediction(request, pk):
         res.append(model_to_dict(i))
 
     max_user_id = training_data.order_by('-user_id').first()
-    # print(max_user_id.user_id)
 
     new_user_id = max_user_id.user_id + 1
-    # print("dsadsadsadsa")
-    # print(len(user_movie))
 
     j = 1000000
     for i in user_movie:
         train_data_obj = TrainData(user_id=new_user_id, movie_id=i.movie_id, rating=int(i.rating), rating_id=j + 1)
         res.append(model_to_dict(train_data_obj))
 
-    # print(new_user_id)
-
     my_training_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id', 'rating'])
     my_training_data = my_training_data.drop(columns=['rating_id'])
     sparse_train_data = csr_matrix((my_training_data.rating.values, (my_training_data.user_id.values,
                                                                      my_training_data.movie_id.values)))
-    # print(sparse_train_data)
+    print(sparse_train_data)
 
     most_similar_user_id = get_most_similar_user(new_user_id, sparse_train_data)
-    # print(most_similar_user_id)
+    print(most_similar_user_id)
     predictions = Prediction.objects.filter(user_id=most_similar_user_id)
-    # print("dsadsadaALALAL")
-    max_prediction = predictions.order_by('-rating').first()
 
-    # movie = Movie.objects.get(pk=max_prediction.movie_id)
-    # best_movie = DetailsMovieSerializer(data=max_prediction.movie_id)
-    # print(max_prediction.movie_id.movie_title)
-    return JsonResponse(max_prediction.movie_id.movie_title, status=status.HTTP_200_OK,
-                        safe=False)
+    max_prediction = predictions.order_by('-rating')[0:3]
+    movies = []
+
+    for m in max_prediction:
+        movies.append(model_to_dict(m.movie_id))
+
+    try:
+        return JsonResponse(movies, status=status.HTTP_200_OK, safe=False)
+    except Exception as e:
+        return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])

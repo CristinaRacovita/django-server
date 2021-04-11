@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-from numpy.ma import indices
 from sklearn.metrics.pairwise import cosine_similarity
 
 
@@ -13,9 +12,7 @@ def build_sparse_tensor(np_array, indices, shape):
 
 def get_most_similar_user(pk, train_sparse_matrix):
     user_similarity = np.argsort(cosine_similarity(train_sparse_matrix[pk], train_sparse_matrix).ravel())
-    print("dsadsadsa")
     length_sim = user_similarity.size
-    print("dsadsadsa123456")
     return user_similarity[length_sim - 2]
 
 

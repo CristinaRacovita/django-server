@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import User, TrainData, Movie, Rating, RatingMovieUser
+from .models import User, TrainData, Movie, RatingMovieUser
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -47,6 +47,26 @@ class DetailsMovieSerializer(serializers.ModelSerializer):
                 'allow_blank': True,
             },
             'image_url': {
+                'required': False,
+                'allow_blank': True,
+            }
+        }
+
+
+class MovieSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Movie
+        fields = '__all__'
+        extra_kwargs = {
+            'release_date': {
+                'required': False,
+                'allow_blank': True,
+            },
+            'image_url': {
+                'required': False,
+                'allow_blank': True,
+            },
+            'description': {
                 'required': False,
                 'allow_blank': True,
             }
