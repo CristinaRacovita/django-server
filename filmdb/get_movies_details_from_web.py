@@ -3,9 +3,6 @@ from bs4 import BeautifulSoup
 
 
 def get_image_url_and_synopsis_by_title(title):
-    if title == 'M*A*S*H (1970)':
-        title = 'MASH (1970)'
-
     image_url = None
     url = 'https://www.whatismymovie.com/results?text=' + title
     page = requests.get(url).text

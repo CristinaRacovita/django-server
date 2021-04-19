@@ -2,7 +2,6 @@ import itertools
 
 import numpy as np
 import pandas as pd
-import tensorflow
 from django.forms.models import model_to_dict
 from django.http import JsonResponse
 from rest_framework import status
@@ -12,9 +11,10 @@ from scipy.sparse import csr_matrix
 
 from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
 from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
-from .models import User, TrainData, Movie, Prediction, RatingMovieUser
+from .models import User, TrainData, Movie, Prediction, Rating
 from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
-    RatingSerializer, UserSerializer, MovieSerializer
+    RatingSerializer, UserSerializer, WatchedMovieSerializer
+from .translation import translate_in_romanian
 
 
 @api_view(['GET', 'POST'])
@@ -53,16 +53,21 @@ def get_movies(request):
         return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
     if request.method == 'POST':
         movies = JSONParser().parse(request)
+
         movie_serializer = DisplayMovieSerializer(data=movies, many=True)
-        if movie_serializer.is_valid():
-            movie_serializer.save()
-            return JsonResponse(movie_serializer.data, status=status.HTTP_201_CREATED, safe=False)
-        return JsonResponse(movie_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+        try:
+            if movie_serializer.is_valid(raise_exception=True):
+                movie_serializer.save()
+                return JsonResponse(movie_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+            print("BAD")
+            return JsonResponse(movie_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
 
 
 @api_view(['GET'])
 def get_prediction(request, pk):
-    user_movie = RatingMovieUser.objects.filter(user_id=int(pk))
+    user_movie = Rating.objects.filter(user_id=int(pk))
 
     training_data = TrainData.objects.all()
     res = []
@@ -73,7 +78,7 @@ def get_prediction(request, pk):
 
     new_user_id = max_user_id.user_id + 1
 
-    j = 1000000
+    j = 1100000
     for i in user_movie:
         train_data_obj = TrainData(user_id=new_user_id, movie_id=i.movie_id, rating=int(i.rating), rating_id=j + 1)
         res.append(model_to_dict(train_data_obj))
@@ -82,10 +87,10 @@ def get_prediction(request, pk):
     my_training_data = my_training_data.drop(columns=['rating_id'])
     sparse_train_data = csr_matrix((my_training_data.rating.values, (my_training_data.user_id.values,
                                                                      my_training_data.movie_id.values)))
-    print(sparse_train_data)
+    # print(sparse_train_data)
 
     most_similar_user_id = get_most_similar_user(new_user_id, sparse_train_data)
-    print(most_similar_user_id)
+    # print(most_similar_user_id)
     predictions = Prediction.objects.filter(user_id=most_similar_user_id)
 
     max_prediction = predictions.order_by('-rating')[0:3]
@@ -100,9 +105,9 @@ def get_prediction(request, pk):
         return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
 
 
-@api_view(['GET'])
-def get_predictions(request):
-    if request.method == 'GET':
+@api_view(['POST'])
+def post_predictions(request):
+    if request.method == 'POST':
         Prediction.objects.all().delete()
 
         training_data = TrainData.objects.all()
@@ -118,16 +123,16 @@ def get_predictions(request):
         mf = MatrixFactorization(R, latent_features=20)
         mf.train(alpha=0.0003, iterations=50000, beta=0.0001)
 
-        input = mf.full_matrix()
-        output = tensorflow.where(input > 5, tensorflow.math.floor(input), input)
-        ceil_predictions_matrix = tensorflow.math.ceil(output)
+        # input = mf.full_matrix()
+        # output = tensorflow.where(input > 5, tensorflow.math.floor(input), input)
+        # ceil_predictions_matrix = tensorflow.math.ceil(output)
 
         print()
         print("P x Q:")
-        print(ceil_predictions_matrix)
+        print(mf.full_matrix())
         print()
 
-        predictions = ceil_predictions_matrix.numpy()
+        predictions = mf.full_matrix().numpy()
 
         shape_0 = predictions.shape[0]
         shape_1 = predictions.shape[1]
@@ -135,10 +140,12 @@ def get_predictions(request):
         indices = itertools.product(list(range(shape_0)), list(range(shape_1)))
         prediction_data = []
 
+        movies_index = my_training_data.movie_id.unique()
+
         table_pred = {"user_id": [], "movie_id": [], "rating": []}
         for [i, j] in indices:
             table_pred['user_id'].append(i + 1)
-            table_pred['movie_id'].append(j + 1)
+            table_pred['movie_id'].append(movies_index[j])
             table_pred['rating'].append(predictions[i][j])
 
         for index in range(len(table_pred['user_id'])):
@@ -157,10 +164,9 @@ def update_image_url_and_description_for_movies(request):
     if request.method == 'PUT':
         movies = Movie.objects.all()
         for movie in movies:
-            if movie.movie_id != 243:
-                image_url, synopsis = get_image_url_and_synopsis_by_title(movie.movie_title)
-                movie.image_url = image_url
-                movie.description = synopsis
+            image_url, synopsis = get_image_url_and_synopsis_by_title(movie.movie_title)
+            movie.image_url = image_url
+            movie.description_en = synopsis
 
             movie.save()
         return JsonResponse("Done.", status=status.HTTP_201_CREATED, safe=False)
@@ -199,3 +205,45 @@ def rate_movies(request):
             rating_serializer.save()
             return JsonResponse(rating_serializer.data, status=status.HTTP_201_CREATED, safe=False)
         return JsonResponse(rating_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+
+@api_view(['GET'])
+def get_watched_movies(request, pk):
+    if request.method == 'GET':
+        ratings = Rating.objects.filter(user_id=int(pk))
+        watched_movies = []
+
+        for r in ratings:
+            watched_movies.append({"movie_title": r.movie_id.movie_title, "rating": r.rating})
+
+        movie_serializer = WatchedMovieSerializer(data=watched_movies, many=True)
+        try:
+            if movie_serializer.is_valid():
+                return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
+            return JsonResponse(movie_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['PUT'])
+def add_description_ro(request):
+    if request.method == 'PUT':
+        movies = Movie.objects.all()
+
+        try:
+            for movie in movies:
+                if movie.description_ro is None and movie.movie_title:
+                    print(movie.movie_title)
+                    description_ro = translate_in_romanian(movie.description_en)
+                    movie.description_ro = description_ro
+
+                    movie.save()
+
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            return JsonResponse("Done.", status=status.HTTP_201_CREATED,
+                                safe=False)
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)

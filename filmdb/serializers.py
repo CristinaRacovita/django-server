@@ -1,6 +1,8 @@
+from abc import ABC
+
 from rest_framework import serializers
 
-from .models import User, TrainData, Movie, RatingMovieUser
+from .models import User, TrainData, Movie, Rating
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -28,9 +30,17 @@ class TrainDataSerializer(serializers.ModelSerializer):
 class DisplayMovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = Movie
-        fields = ('movie_id', 'movie_title')
+        fields = ['movie_id', 'movie_title']
         extra_kwargs = {
-            'release_date': {
+            'image_url': {
+                'required': False,
+                'allow_blank': True,
+            },
+            'description_en': {
+                'required': False,
+                'allow_blank': True,
+            },
+            'description_ro': {
                 'required': False,
                 'allow_blank': True,
             }
@@ -42,10 +52,6 @@ class DetailsMovieSerializer(serializers.ModelSerializer):
         model = Movie
         fields = ('movie_id', 'movie_title', 'image_url')
         extra_kwargs = {
-            'release_date': {
-                'required': False,
-                'allow_blank': True,
-            },
             'image_url': {
                 'required': False,
                 'allow_blank': True,
@@ -58,15 +64,15 @@ class MovieSerializer(serializers.ModelSerializer):
         model = Movie
         fields = '__all__'
         extra_kwargs = {
-            'release_date': {
-                'required': False,
-                'allow_blank': True,
-            },
             'image_url': {
                 'required': False,
                 'allow_blank': True,
             },
-            'description': {
+            'description_en': {
+                'required': False,
+                'allow_blank': True,
+            },
+            'description_ro': {
                 'required': False,
                 'allow_blank': True,
             }
@@ -81,5 +87,16 @@ class PredictionSerializer(serializers.ModelSerializer):
 
 class RatingSerializer(serializers.ModelSerializer):
     class Meta:
-        model = RatingMovieUser
+        model = Rating
         fields = ('user_id', 'movie_id', 'rating',)
+
+
+class WatchedMovieSerializer(serializers.Serializer):
+    movie_title = serializers.CharField(max_length=200)
+    rating = serializers.FloatField()
+
+    def update(self, instance, validated_data):
+        pass
+
+    def create(self, validated_data):
+        pass
