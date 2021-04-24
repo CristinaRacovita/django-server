@@ -100,3 +100,9 @@ class WatchedMovieSerializer(serializers.Serializer):
 
     def create(self, validated_data):
         pass
+
+
+class ProfileImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('profile_image',)

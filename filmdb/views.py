@@ -13,7 +13,7 @@ from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
 from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
 from .models import User, TrainData, Movie, Prediction, Rating
 from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
-    RatingSerializer, UserSerializer, WatchedMovieSerializer
+    RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer
 from .translation import translate_in_romanian
 
 
@@ -93,7 +93,7 @@ def get_prediction(request, pk):
     # print(most_similar_user_id)
     predictions = Prediction.objects.filter(user_id=most_similar_user_id)
 
-    max_prediction = predictions.order_by('-rating')[0:3]
+    max_prediction = predictions.order_by('-rating')[0:10]
     movies = []
 
     for m in max_prediction:
@@ -245,5 +245,42 @@ def add_description_ro(request):
         try:
             return JsonResponse("Done.", status=status.HTTP_201_CREATED,
                                 safe=False)
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def upload_image(request, pk):
+    if request.method == 'POST':
+        print("I am here")
+        user = User.objects.filter(user_id=int(pk))[0]
+        print("I am here")
+        print(request.data['model_pic'])
+
+        try:
+            user.profile_image = request.data['model_pic']
+            user.save()
+
+            return JsonResponse("Done.", status=status.HTTP_201_CREATED,
+                                safe=False)
+        except Exception as e:
+            print(e.args[0])
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def image(request, pk):
+    if request.method == 'GET':
+        user = User.objects.filter(user_id=int(pk))[0]
+        try:
+            if user.profile_image:
+                print(type(user.profile_image))
+                dict_user = {"profile_image": user.profile_image}
+                user_serializer = ProfileImageSerializer(data=dict_user)
+                if user_serializer.is_valid():
+                    return JsonResponse(user_serializer.data, status=status.HTTP_200_OK, safe=False)
+                return JsonResponse(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+            else:
+                return JsonResponse({"profile_image": None}, status=status.HTTP_200_OK, safe=False)
         except Exception as e:
             return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)

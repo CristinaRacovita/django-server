@@ -1,3 +1,5 @@
+import base64
+
 from django.db import models
 
 
@@ -22,8 +24,9 @@ class Movie(models.Model):
 
 class User(models.Model):
     user_id = models.AutoField(primary_key=True)
-    username = models.CharField(max_length=100,  db_column='username')
-    password = models.CharField(max_length=100,  db_column='password')
+    username = models.CharField(max_length=100, db_column='username')
+    password = models.CharField(max_length=100, db_column='password')
+    profile_image = models.ImageField(upload_to='', null=True, default=None)
 
     class Meta:
         db_table = 'User'
