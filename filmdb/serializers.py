@@ -106,3 +106,15 @@ class ProfileImageSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ('profile_image',)
+
+
+class UserDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('user_id', 'username', 'profile_image')
+        extra_kwargs = {
+            'username': {
+                'required': False,
+                'allow_blank': True,
+            }
+        }

@@ -13,14 +13,14 @@ from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
 from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
 from .models import User, TrainData, Movie, Prediction, Rating
 from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
-    RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer
+    RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer, UserDetailsSerializer
 from .translation import translate_in_romanian
 
 
 @api_view(['GET', 'POST'])
 def credentials_list(request):
     if request.method == 'GET':
-        users_serializer = UserSerializer(User.objects.all(), many=True)
+        users_serializer = UserDetailsSerializer(User.objects.all(), many=True)
         return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)
     elif request.method == 'POST':
         user_data = JSONParser().parse(request)
@@ -29,6 +29,13 @@ def credentials_list(request):
             user_serializer.save()
             return JsonResponse(user_serializer.data, status=status.HTTP_201_CREATED)
         return JsonResponse(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def credentials(request):
+    if request.method == 'GET':
+        users_serializer = UserSerializer(User.objects.all(), many=True)
+        return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)
 
 
 @api_view(['GET', 'POST'])
@@ -68,6 +75,9 @@ def get_movies(request):
 @api_view(['GET'])
 def get_prediction(request, pk):
     user_movie = Rating.objects.filter(user_id=int(pk))
+    genre = request.GET.get('genre', '')
+    year = request.GET.get('year', '')
+    print(genre + " " + year + "\n")
 
     training_data = TrainData.objects.all()
     res = []
@@ -284,3 +294,27 @@ def image(request, pk):
                 return JsonResponse({"profile_image": None}, status=status.HTTP_200_OK, safe=False)
         except Exception as e:
             return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def get_users_details(request, ids):
+    if request.method == 'GET':
+        ids_str_arr = ids.split("-")
+
+        ids_arr = []
+        for movie_id in ids_str_arr:
+            if movie_id != '':
+                try:
+                    int_id = int(movie_id)
+                    ids_arr.append(int_id)
+                except ValueError:
+                    return JsonResponse("Not a int", status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+        users = []
+        for user_id in ids_arr:
+            user = User.objects.get(user_id=user_id)
+            users.append(user)
+
+        users_serializer = UserDetailsSerializer(users, many=True)
+
+        return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)

@@ -2,7 +2,7 @@ from django.conf.urls import url
 
 from .views import credentials_list, train_data, get_movies, post_predictions, get_prediction, \
     update_image_url_and_description_for_movies, get_movies_details, rate_movies, get_watched_movies, \
-    add_description_ro, upload_image, image
+    add_description_ro, upload_image, image, get_users_details, credentials
 
 urlpatterns = [
     url(r'^credentials$', credentials_list),
@@ -17,5 +17,7 @@ urlpatterns = [
     url(r'^updateDescriptionRo$', add_description_ro),
     url(r'^upload/(?P<pk>[0-9]+)$', upload_image),
     url(r'^image/(?P<pk>[0-9]+)$', image),
+    url(r'^users/(?P<ids>[\w\-]+)$', get_users_details),
+    url(r'^all_users$', credentials),
 
 ]
