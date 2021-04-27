@@ -17,18 +17,35 @@ from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMov
 from .translation import translate_in_romanian
 
 
-@api_view(['GET', 'POST'])
+@api_view(['POST'])
 def credentials_list(request):
-    if request.method == 'GET':
-        users_serializer = UserDetailsSerializer(User.objects.all(), many=True)
-        return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)
-    elif request.method == 'POST':
+    if request.method == 'POST':
         user_data = JSONParser().parse(request)
+
+        users = User.objects.all()
+        for user in users:
+            if user.username == user_data['username']:
+                return JsonResponse({"user_id": None, "username": None, "password": None},
+                                    status=status.HTTP_201_CREATED)
+
         user_serializer = UserSerializer(data=user_data)
         if user_serializer.is_valid():
             user_serializer.save()
             return JsonResponse(user_serializer.data, status=status.HTTP_201_CREATED)
         return JsonResponse(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def check_credentials(request):
+    if request.method == 'POST':
+        user_data = JSONParser().parse(request)
+
+        users = User.objects.all()
+        for user in users:
+            if user.username == user_data['username'] and user.password == user_data['password']:
+                return JsonResponse({"user_id": user.user_id, "username": user.username}, status=status.HTTP_200_OK)
+
+        return JsonResponse({"user_id": None, "username": None}, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
