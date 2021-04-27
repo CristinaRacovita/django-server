@@ -11,13 +11,14 @@ from scipy.sparse import csr_matrix
 
 from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
 from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
-from .models import User, TrainData, Movie, Prediction, Rating
+from .models import User, TrainData, Movie, Prediction, Rating, GroupUser, Group
 from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
-    RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer, UserDetailsSerializer
+    RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer, UserDetailsSerializer, \
+    GroupSerializer, GroupUserSerializer
 from .translation import translate_in_romanian
 
 
-@api_view(['POST'])
+@api_view(['POST', 'GET'])
 def credentials_list(request):
     if request.method == 'POST':
         user_data = JSONParser().parse(request)
@@ -33,6 +34,9 @@ def credentials_list(request):
             user_serializer.save()
             return JsonResponse(user_serializer.data, status=status.HTTP_201_CREATED)
         return JsonResponse(user_serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    if request.method == 'GET':
+        users_serializer = UserDetailsSerializer(User.objects.all(), many=True)
+        return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)
 
 
 @api_view(['POST'])
@@ -46,13 +50,6 @@ def check_credentials(request):
                 return JsonResponse({"user_id": user.user_id, "username": user.username}, status=status.HTTP_200_OK)
 
         return JsonResponse({"user_id": None, "username": None}, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
-def credentials(request):
-    if request.method == 'GET':
-        users_serializer = UserSerializer(User.objects.all(), many=True)
-        return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)
 
 
 @api_view(['GET', 'POST'])
@@ -279,11 +276,7 @@ def add_description_ro(request):
 @api_view(['POST'])
 def upload_image(request, pk):
     if request.method == 'POST':
-        print("I am here")
         user = User.objects.filter(user_id=int(pk))[0]
-        print("I am here")
-        print(request.data['model_pic'])
-
         try:
             user.profile_image = request.data['model_pic']
             user.save()
@@ -335,3 +328,40 @@ def get_users_details(request, ids):
         users_serializer = UserDetailsSerializer(users, many=True)
 
         return JsonResponse(users_serializer.data, status=status.HTTP_200_OK, safe=False)
+
+
+@api_view(['POST'])
+def add_group(request):
+    if request.method == 'POST':
+        group = JSONParser().parse(request)
+        group_serializer = GroupSerializer(data=group)
+        try:
+            if group_serializer.is_valid():
+                group_serializer.save()
+                return JsonResponse(group_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+            return JsonResponse(group_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+def add_members(request):
+    if request.method == 'POST':
+        group_user = JSONParser().parse(request)
+        group_user_serializer = GroupUserSerializer(data=group_user, many=True)
+        if group_user_serializer.is_valid():
+            group_user_serializer.save()
+            return JsonResponse(group_user_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+        return JsonResponse(group_user_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+
+@api_view(['GET'])
+def get_all_group(request, pk):
+    if request.method == 'GET':
+        groups_users = GroupUser.objects.filter(user_id=int(pk))
+        groups = []
+        for group_user in groups_users:
+            print(group_user.group_id.group_id)
+            groups.append({"group_id": group_user.group_id.group_id, "group_name": group_user.group_id.group_name})
+
+        return JsonResponse(groups, status=status.HTTP_200_OK, safe=False)

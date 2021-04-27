@@ -1,8 +1,6 @@
-from abc import ABC
-
 from rest_framework import serializers
 
-from .models import User, TrainData, Movie, Rating
+from .models import User, TrainData, Movie, Rating, Group, GroupUser
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -118,3 +116,15 @@ class UserDetailsSerializer(serializers.ModelSerializer):
                 'allow_blank': True,
             }
         }
+
+
+class GroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Group
+        fields = '__all__'
+
+
+class GroupUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GroupUser
+        fields = ('group_id', 'user_id', 'group_user_id')
