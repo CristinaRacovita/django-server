@@ -10,12 +10,6 @@ def build_sparse_tensor(np_array, indices, shape):
         dense_shape=[shape[0], shape[1]])
 
 
-def get_most_similar_user(pk, train_sparse_matrix):
-    user_similarity = np.argsort(cosine_similarity(train_sparse_matrix[pk], train_sparse_matrix).ravel())
-    length_sim = user_similarity.size
-    return user_similarity[length_sim - 2]
-
-
 class MatrixFactorization:
     def __init__(self, data, latent_features):
         self.latent_features = latent_features

@@ -2,6 +2,7 @@ import itertools
 
 import numpy as np
 import pandas as pd
+from django.db.models import Max
 from django.forms.models import model_to_dict
 from django.http import JsonResponse
 from rest_framework import status
@@ -9,12 +10,12 @@ from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser
 from scipy.sparse import csr_matrix
 
-from .get_movies_details_from_web import get_image_url_and_synopsis_by_title
-from .matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
-from .models import User, TrainData, Movie, Prediction, Rating, GroupUser, Group
-from .serializers import TrainDataSerializer, DisplayMovieSerializer, DetailsMovieSerializer, \
+from utils.matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
+from utils.similarity import get_most_similar_users
+from .models import User, TrainData, Movie, Prediction, Rating, GroupUser, GroupUserMovie
+from .serializers import TrainDataSerializer, DetailsMovieSerializer, \
     RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer, UserDetailsSerializer, \
-    GroupSerializer, GroupUserSerializer
+    GroupSerializer, GroupUserSerializer, GroupMovieSerializer, MovieSerializer
 from .translation import translate_in_romanian
 
 
@@ -70,12 +71,12 @@ def train_data(request):
 @api_view(['GET', 'POST'])
 def get_movies(request):
     if request.method == 'GET':
-        movie_serializer = DisplayMovieSerializer(Movie.objects.all(), many=True)
+        movie_serializer = MovieSerializer(Movie.objects.all(), many=True)
         return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
     if request.method == 'POST':
         movies = JSONParser().parse(request)
 
-        movie_serializer = DisplayMovieSerializer(data=movies, many=True)
+        movie_serializer = MovieSerializer(data=movies, many=True)
         try:
             if movie_serializer.is_valid(raise_exception=True):
                 movie_serializer.save()
@@ -102,19 +103,17 @@ def get_prediction(request, pk):
 
     new_user_id = max_user_id.user_id + 1
 
-    j = 1100000
     for i in user_movie:
-        train_data_obj = TrainData(user_id=new_user_id, movie_id=i.movie_id, rating=int(i.rating), rating_id=j + 1)
+        train_data_obj = TrainData(user_id=new_user_id, movie_id=i.movie_id, rating=int(i.rating), rating_id= None)
         res.append(model_to_dict(train_data_obj))
 
     my_training_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id', 'rating'])
     my_training_data = my_training_data.drop(columns=['rating_id'])
     sparse_train_data = csr_matrix((my_training_data.rating.values, (my_training_data.user_id.values,
                                                                      my_training_data.movie_id.values)))
-    # print(sparse_train_data)
 
-    most_similar_user_id = get_most_similar_user(new_user_id, sparse_train_data)
-    # print(most_similar_user_id)
+    most_similar_user_id = get_most_similar_users(my_training_data[my_training_data['user_id'] == new_user_id],
+                                                  sparse_train_data)
     predictions = Prediction.objects.filter(user_id=most_similar_user_id)
 
     max_prediction = predictions.order_by('-rating')[0:10]
@@ -140,16 +139,26 @@ def post_predictions(request):
             res.append(model_to_dict(i))
 
         my_training_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id', 'rating'])
-        R = np.array(my_training_data.pivot(index='user_id', columns='movie_id', values='rating').fillna(0))
+        del my_training_data['rating_id']
+
+        print(my_training_data)
+
+        ratings = Rating.objects.all()
+        print(ratings)
+
+        real_ratings = []
+        for rating in ratings:
+            real_ratings.append(model_to_dict(rating))
+
+        ratings_data = pd.DataFrame(real_ratings, columns=['user_id', 'movie_id', 'rating'])
+        all_data = pd.concat([my_training_data, ratings_data], ignore_index=True, sort=True)
+
+        R = np.array(all_data.pivot(index='user_id', columns='movie_id', values='rating').fillna(0))
         indices = [[i, j] for i in range(R.shape[0]) for j in range(R.shape[1]) if R[i, j] > 0]
         shape = R.shape
-        R = build_sparse_tensor(np.array(my_training_data.rating, dtype=np.float32), indices, shape)
+        R = build_sparse_tensor(np.array(all_data.rating, dtype=np.float32), indices, shape)
         mf = MatrixFactorization(R, latent_features=20)
         mf.train(alpha=0.0003, iterations=50000, beta=0.0001)
-
-        # input = mf.full_matrix()
-        # output = tensorflow.where(input > 5, tensorflow.math.floor(input), input)
-        # ceil_predictions_matrix = tensorflow.math.ceil(output)
 
         print()
         print("P x Q:")
@@ -164,13 +173,13 @@ def post_predictions(request):
         indices = itertools.product(list(range(shape_0)), list(range(shape_1)))
         prediction_data = []
 
-        movies_index = my_training_data.movie_id.unique()
+        movies_index = all_data.movie_id.unique()
 
         table_pred = {"user_id": [], "movie_id": [], "rating": []}
         for [i, j] in indices:
             table_pred['user_id'].append(i + 1)
             table_pred['movie_id'].append(movies_index[j])
-            table_pred['rating'].append(predictions[i][j])
+            table_pred['rating'].append(round(predictions[i][j], 2))
 
         for index in range(len(table_pred['user_id'])):
             movie = Movie.objects.get(pk=table_pred["movie_id"][index])
@@ -181,19 +190,6 @@ def post_predictions(request):
 
         return JsonResponse("Training is completed and predictions are saved.", status=status.HTTP_201_CREATED,
                             safe=False)
-
-
-@api_view(['PUT'])
-def update_image_url_and_description_for_movies(request):
-    if request.method == 'PUT':
-        movies = Movie.objects.all()
-        for movie in movies:
-            image_url, synopsis = get_image_url_and_synopsis_by_title(movie.movie_title)
-            movie.image_url = image_url
-            movie.description_en = synopsis
-
-            movie.save()
-        return JsonResponse("Done.", status=status.HTTP_201_CREATED, safe=False)
 
 
 @api_view(['GET'])
@@ -361,7 +357,37 @@ def get_all_group(request, pk):
         groups_users = GroupUser.objects.filter(user_id=int(pk))
         groups = []
         for group_user in groups_users:
-            print(group_user.group_id.group_id)
-            groups.append({"group_id": group_user.group_id.group_id, "group_name": group_user.group_id.group_name})
+            users_group = GroupUser.objects.filter(group_id=group_user.group_id.group_id)
+            users = []
+            for user in users_group:
+                if user.user_id.user_id != int(pk):
+                    users.append(user.user_id)
+
+            users_serializer = UserDetailsSerializer(users, many=True)
+
+            groups.append({"group_id": group_user.group_id.group_id, "group_name": group_user.group_id.group_name,
+                           "users": users_serializer.data})
 
         return JsonResponse(groups, status=status.HTTP_200_OK, safe=False)
+
+
+@api_view(['GET'])
+def get_group_movie(request, group_id):
+    if request.method == 'GET':
+        groups_users = GroupUserMovie.objects.filter(group_id=int(group_id))
+        movies = []
+        for group in groups_users:
+            movies.append(group.movie_id)
+        movie_serializer = DetailsMovieSerializer(movies, many=True)
+        return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
+
+
+@api_view(['POST'])
+def post_group_movie(request):
+    if request.method == 'POST':
+        group_movie = JSONParser().parse(request)
+        group_movie_serializer = GroupMovieSerializer(data=group_movie)
+
+        if group_movie_serializer.is_valid():
+            group_movie_serializer.save()
+            return JsonResponse(group_movie_serializer.data, status=status.HTTP_201_CREATED, safe=False)

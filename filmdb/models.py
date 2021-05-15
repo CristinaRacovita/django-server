@@ -12,12 +12,24 @@ class Genre(models.Model):
 class Movie(models.Model):
     movie_id = models.IntegerField(primary_key=True)
     movie_title = models.CharField(max_length=500)
+    release_year = models.IntegerField()
     image_url = models.CharField(max_length=250, null=True)
     description_en = models.CharField(max_length=1000, null=True)
     description_ro = models.CharField(max_length=1500, null=True)
 
     class Meta:
         db_table = 'Movie'
+
+
+class Prediction(models.Model):
+    prediction_id = models.AutoField(primary_key=True)
+    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    user_id = models.IntegerField()
+    rating = models.FloatField()
+
+    class Meta:
+        db_table = 'Prediction'
+        unique_together = (('movie_id', 'user_id'),)
 
 
 class User(models.Model):
@@ -62,17 +74,6 @@ class TrainData(models.Model):
         unique_together = (('movie_id', 'user_id'),)
 
 
-class Prediction(models.Model):
-    prediction_id = models.AutoField(primary_key=True)
-    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
-    user_id = models.IntegerField()
-    rating = models.FloatField()
-
-    class Meta:
-        db_table = 'Prediction'
-        unique_together = (('movie_id', 'user_id'),)
-
-
 class Group(models.Model):
     group_id = models.AutoField(primary_key=True)
     group_name = models.CharField(max_length=100, db_column='group_name')
@@ -91,9 +92,9 @@ class GroupUser(models.Model):
 
 
 class GroupUserMovie(models.Model):
-    group_user_movie_id = models.AutoField(primary_key=True)
-    group_user_id = models.ForeignKey(GroupUser, on_delete=models.CASCADE, db_column='group_user_id')
-    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    group_movie_id = models.AutoField(primary_key=True)
+    group_id = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, db_column='group_id')
+    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, null=True, db_column='movie_id')
 
     class Meta:
-        db_table = 'GroupUserMovie'
+        db_table = 'GroupMovie'
