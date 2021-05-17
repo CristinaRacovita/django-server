@@ -23,7 +23,8 @@ class Movie(models.Model):
 
 class Prediction(models.Model):
     prediction_id = models.AutoField(primary_key=True)
-    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id',
+                                 related_name='movie_id_prediction')
     user_id = models.IntegerField()
     rating = models.FloatField()
 
@@ -44,7 +45,8 @@ class User(models.Model):
 
 class MovieGenre(models.Model):
     movie_genre_id = models.AutoField(primary_key=True)
-    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
+    movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id',
+                                 related_name='movie_id_movie_genre')
     genre_id = models.ForeignKey(Genre, on_delete=models.CASCADE, db_column='genre_id')
 
     class Meta:
@@ -56,7 +58,7 @@ class Rating(models.Model):
     rating_id = models.AutoField(primary_key=True)
     movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, db_column='movie_id')
     user_id = models.ForeignKey(User, on_delete=models.CASCADE, db_column='user_id')
-    rating = models.FloatField()
+    rating = models.FloatField(null=True)
 
     class Meta:
         db_table = 'Rating'

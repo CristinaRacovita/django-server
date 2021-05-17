@@ -3,7 +3,8 @@ from django.conf.urls import url
 from .views import credentials_list, train_data, get_movies, post_predictions, get_prediction, \
     get_movies_details, rate_movies, get_watched_movies, \
     add_description_ro, upload_image, image, get_users_details, check_credentials, add_group, add_members, \
-    get_all_group, get_group_movie
+    get_all_group, get_group_movie, post_movies_genres, post_genres, get_group_prediction, get_unrated_movies, \
+    post_group_movie
 
 urlpatterns = [
     url(r'^credentials$', credentials_list),
@@ -23,4 +24,9 @@ urlpatterns = [
     url(r'^addMembers$', add_members),
     url(r'^group/(?P<pk>[0-9]+)$', get_all_group),
     url(r'^group/movies/(?P<group_id>[0-9]+)$', get_group_movie),
+    url(r'^genres$', post_genres),
+    url(r'^moviesGenres$', post_movies_genres),
+    url(r'^group/recommendation/(?P<ids>[\w\-]+)$', get_group_prediction),
+    url(r'^unrated/(?P<pk>[0-9]+)$', get_unrated_movies),
+    url(r'^groupMovies$', post_group_movie),
 ]

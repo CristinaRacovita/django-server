@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import User, TrainData, Movie, Rating, Group, GroupUser, GroupUserMovie
+from .models import User, TrainData, Movie, Rating, Group, GroupUser, GroupUserMovie, Genre, MovieGenre
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -27,6 +27,7 @@ class TrainDataSerializer(serializers.ModelSerializer):
 
 class DisplayMovieSerializer(serializers.ModelSerializer):
     class Meta:
+
         model = Movie
         fields = ['movie_id', 'movie_title']
         extra_kwargs = {
@@ -134,3 +135,15 @@ class GroupMovieSerializer(serializers.ModelSerializer):
     class Meta:
         model = GroupUserMovie
         fields = ('group_id', 'movie_id', 'group_movie_id')
+
+
+class GenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Genre
+        fields = '__all__'
+
+
+class MovieGenreSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MovieGenre
+        fields = '__all__'

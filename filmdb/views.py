@@ -2,21 +2,25 @@ import itertools
 
 import numpy as np
 import pandas as pd
-from django.db.models import Max
 from django.forms.models import model_to_dict
 from django.http import JsonResponse
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser
-from scipy.sparse import csr_matrix
 
-from utils.matrix_factorizarion import build_sparse_tensor, MatrixFactorization, get_most_similar_user
-from utils.similarity import get_most_similar_users
-from .models import User, TrainData, Movie, Prediction, Rating, GroupUser, GroupUserMovie
+from utils.group_election import borda_count
+from utils.matrix_factorizarion import build_sparse_tensor, MatrixFactorization
+from utils.similarity import get_most_similar_users, get_best_movies_for_new_user
+from .models import User, TrainData, Movie, Prediction, Rating, GroupUser, GroupUserMovie, MovieGenre
 from .serializers import TrainDataSerializer, DetailsMovieSerializer, \
     RatingSerializer, UserSerializer, WatchedMovieSerializer, ProfileImageSerializer, UserDetailsSerializer, \
-    GroupSerializer, GroupUserSerializer, GroupMovieSerializer, MovieSerializer
+    GroupSerializer, GroupUserSerializer, GroupMovieSerializer, MovieSerializer, GenreSerializer, MovieGenreSerializer, \
+    DisplayMovieSerializer
 from .translation import translate_in_romanian
+
+NO_OF_SIMILAR_USERS = 12
+
+NO_OF_MOVIES = 5
 
 
 @api_view(['POST', 'GET'])
@@ -88,44 +92,126 @@ def get_movies(request):
 
 
 @api_view(['GET'])
+def get_group_prediction(request, ids):
+    if request.method == 'GET':
+        ids_str_arr = ids.split("-")
+
+        ids_arr = []
+        for user_id in ids_str_arr:
+            if user_id != '':
+                try:
+                    int_id = int(user_id)
+                    ids_arr.append(int_id)
+                except ValueError:
+                    return JsonResponse("Not a int", status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+        user_movie = Rating.objects.filter(user_id__in=ids_arr)
+        ratings = list(user_movie.select_related('movie_id').values('movie_id__movie_id'))
+
+        watched_movies = []
+        for movie in ratings:
+            watched_movies.append(movie['movie_id__movie_id'])
+
+        predictions_df = pd.DataFrame(list(Prediction.objects.all().select_related('movie_id').exclude(
+            movie_id__movie_id__in=watched_movies).values()))
+
+        movies = borda_count(ids_arr, user_movie.exclude(rating__isnull=True), predictions_df, NO_OF_MOVIES)
+        movies_dict = []
+        for movie_id in movies:
+            movie = Movie.objects.get(pk=movie_id)
+            movies_dict.append(model_to_dict(movie))
+
+        try:
+            return JsonResponse(movies_dict, status=status.HTTP_200_OK, safe=False)
+        except Exception as e:
+            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
 def get_prediction(request, pk):
-    user_movie = Rating.objects.filter(user_id=int(pk))
     genre = request.GET.get('genre', '')
     year = request.GET.get('year', '')
     print(genre + " " + year + "\n")
 
-    training_data = TrainData.objects.all()
-    res = []
-    for i in training_data:
-        res.append(model_to_dict(i))
+    predictions_df = get_predictions(genre, year, pk)
 
-    max_user_id = training_data.order_by('-user_id').first()
+    if predictions_df[predictions_df['user_id'] == int(pk)].empty:
+        most_similar_users = get_similar_user(pk)
+    else:
+        most_similar_users = [int(pk)]
 
-    new_user_id = max_user_id.user_id + 1
-
-    for i in user_movie:
-        train_data_obj = TrainData(user_id=new_user_id, movie_id=i.movie_id, rating=int(i.rating), rating_id= None)
-        res.append(model_to_dict(train_data_obj))
-
-    my_training_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id', 'rating'])
-    my_training_data = my_training_data.drop(columns=['rating_id'])
-    sparse_train_data = csr_matrix((my_training_data.rating.values, (my_training_data.user_id.values,
-                                                                     my_training_data.movie_id.values)))
-
-    most_similar_user_id = get_most_similar_users(my_training_data[my_training_data['user_id'] == new_user_id],
-                                                  sparse_train_data)
-    predictions = Prediction.objects.filter(user_id=most_similar_user_id)
-
-    max_prediction = predictions.order_by('-rating')[0:10]
+    max_prediction_ids = get_best_movies_for_new_user(predictions_df, most_similar_users, NO_OF_MOVIES)
     movies = []
 
-    for m in max_prediction:
-        movies.append(model_to_dict(m.movie_id))
+    for movie_id in max_prediction_ids:
+        movie = Movie.objects.get(pk=movie_id)
+        movies.append(model_to_dict(movie))
 
     try:
         return JsonResponse(movies, status=status.HTTP_200_OK, safe=False)
     except Exception as e:
         return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def get_predictions(genre, year, pk):
+    ratings = list(Rating.objects.filter(user_id=int(pk)).select_related('movie_id').values('movie_id__movie_id'))
+
+    watched_movies = []
+    for movie in ratings:
+        watched_movies.append(movie['movie_id__movie_id'])
+
+    if genre != '' or year != '':
+        if genre != '':
+            movie_genre = list(MovieGenre.objects.all().select_related('genre_id', 'movie_id').filter(
+                genre_id__genre_value=genre).exclude(movie_id__movie_id__in=watched_movies).values(
+                'movie_id__movie_id'))
+            selected_movies = []
+            for movie in movie_genre:
+                selected_movies.append(movie['movie_id__movie_id'])
+
+        if genre != '' and year != '':
+            year = int(year)
+            predictions = pd.DataFrame(list(
+                Prediction.objects.all().select_related('movie_id').filter(movie_id__release_year__gte=year).filter(
+                    movie_id__movie_id__in=selected_movies).exclude(movie_id__movie_id__in=watched_movies).values()))
+        elif genre != '':
+            predictions = pd.DataFrame(list(
+                Prediction.objects.all().select_related('movie_id').filter(
+                    movie_id__movie_id__in=selected_movies).exclude(movie_id__movie_id__in=watched_movies).values()))
+        elif year != '':
+            year = int(year)
+            predictions = pd.DataFrame(list(
+                Prediction.objects.all().select_related('movie_id').filter(movie_id__release_year__gte=year).exclude(
+                    movie_id__movie_id__in=watched_movies).values()))
+
+    else:
+        predictions = pd.DataFrame(
+            list(Prediction.objects.all().exclude(movie_id__movie_id__in=watched_movies).values()))
+
+    return predictions
+
+
+def get_similar_user(pk):
+    user_movie = Rating.objects.filter(user_id=int(pk)).exclude(rating__isnull=True)
+
+    train_data_df = pd.DataFrame(list(TrainData.objects.all().values()))
+
+    res = {"user_id": [], "movie_id_id": [], "rating": [], "rating_id": []}
+
+    for i in user_movie:
+        res["user_id"].append(int(pk))
+        res["movie_id_id"].append(i.movie_id.movie_id)
+        res["rating"].append(i.rating)
+        res["rating_id"].append(None)
+
+    user_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id_id', 'rating'])
+
+    all_train_data = pd.concat([train_data_df, user_data], ignore_index=True, sort=True)
+    all_train_data = all_train_data.drop(columns=['rating_id'])
+
+    most_similar_users = get_most_similar_users(int(pk), all_train_data, NO_OF_SIMILAR_USERS)
+
+    return most_similar_users
 
 
 @api_view(['POST'])
@@ -134,52 +220,18 @@ def post_predictions(request):
         Prediction.objects.all().delete()
 
         training_data = TrainData.objects.all()
-        res = []
-        for i in training_data:
-            res.append(model_to_dict(i))
-
-        my_training_data = pd.DataFrame(res, columns=['rating_id', 'user_id', 'movie_id', 'rating'])
+        my_training_data = get_df_from_models(training_data, ['rating_id', 'user_id', 'movie_id', 'rating'])
         del my_training_data['rating_id']
 
         print(my_training_data)
 
-        ratings = Rating.objects.all()
-        print(ratings)
-
-        real_ratings = []
-        for rating in ratings:
-            real_ratings.append(model_to_dict(rating))
-
-        ratings_data = pd.DataFrame(real_ratings, columns=['user_id', 'movie_id', 'rating'])
+        ratings = Rating.objects.all().exclude(rating__isnull=True)
+        ratings_data = get_df_from_models(ratings, ['user_id', 'movie_id', 'rating'])
         all_data = pd.concat([my_training_data, ratings_data], ignore_index=True, sort=True)
 
-        R = np.array(all_data.pivot(index='user_id', columns='movie_id', values='rating').fillna(0))
-        indices = [[i, j] for i in range(R.shape[0]) for j in range(R.shape[1]) if R[i, j] > 0]
-        shape = R.shape
-        R = build_sparse_tensor(np.array(all_data.rating, dtype=np.float32), indices, shape)
-        mf = MatrixFactorization(R, latent_features=20)
-        mf.train(alpha=0.0003, iterations=50000, beta=0.0001)
+        predictions = training_process(all_data)
 
-        print()
-        print("P x Q:")
-        print(mf.full_matrix())
-        print()
-
-        predictions = mf.full_matrix().numpy()
-
-        shape_0 = predictions.shape[0]
-        shape_1 = predictions.shape[1]
-
-        indices = itertools.product(list(range(shape_0)), list(range(shape_1)))
-        prediction_data = []
-
-        movies_index = all_data.movie_id.unique()
-
-        table_pred = {"user_id": [], "movie_id": [], "rating": []}
-        for [i, j] in indices:
-            table_pred['user_id'].append(i + 1)
-            table_pred['movie_id'].append(movies_index[j])
-            table_pred['rating'].append(round(predictions[i][j], 2))
+        prediction_data, table_pred = process_data_for_prediction_table(all_data, predictions)
 
         for index in range(len(table_pred['user_id'])):
             movie = Movie.objects.get(pk=table_pred["movie_id"][index])
@@ -190,6 +242,42 @@ def post_predictions(request):
 
         return JsonResponse("Training is completed and predictions are saved.", status=status.HTTP_201_CREATED,
                             safe=False)
+
+
+def process_data_for_prediction_table(all_data, predictions):
+    shape_0 = predictions.shape[0]
+    shape_1 = predictions.shape[1]
+    indices = itertools.product(list(range(shape_0)), list(range(shape_1)))
+    prediction_data = []
+    movies_index = all_data.movie_id.unique()
+    table_pred = {"user_id": [], "movie_id": [], "rating": []}
+    for [i, j] in indices:
+        table_pred['user_id'].append(i + 1)
+        table_pred['movie_id'].append(movies_index[j])
+        table_pred['rating'].append(round(predictions[i][j], 2))
+    return prediction_data, table_pred
+
+
+def training_process(data):
+    R = np.array(data.pivot(index='user_id', columns='movie_id', values='rating').fillna(0))
+    indices = [[i, j] for i in range(R.shape[0]) for j in range(R.shape[1]) if R[i, j] > 0]
+    shape = R.shape
+    R = build_sparse_tensor(np.array(data.rating, dtype=np.float32), indices, shape)
+    mf = MatrixFactorization(R, latent_features=20)
+    mf.train(alpha=0.0003, iterations=50000, beta=0.0001)
+    print()
+    print("P x Q:")
+    print(mf.full_matrix())
+    print()
+    predictions = mf.full_matrix().numpy()
+    return predictions
+
+
+def get_df_from_models(data, columns):
+    res = []
+    for i in data:
+        res.append(model_to_dict(i))
+    return pd.DataFrame(res, columns=columns)
 
 
 @api_view(['GET'])
@@ -230,7 +318,7 @@ def rate_movies(request):
 @api_view(['GET'])
 def get_watched_movies(request, pk):
     if request.method == 'GET':
-        ratings = Rating.objects.filter(user_id=int(pk))
+        ratings = Rating.objects.filter(user_id=int(pk)).exclude(rating__isnull=True)
         watched_movies = []
 
         for r in ratings:
@@ -360,8 +448,7 @@ def get_all_group(request, pk):
             users_group = GroupUser.objects.filter(group_id=group_user.group_id.group_id)
             users = []
             for user in users_group:
-                if user.user_id.user_id != int(pk):
-                    users.append(user.user_id)
+                users.append(user.user_id)
 
             users_serializer = UserDetailsSerializer(users, many=True)
 
@@ -378,7 +465,7 @@ def get_group_movie(request, group_id):
         movies = []
         for group in groups_users:
             movies.append(group.movie_id)
-        movie_serializer = DetailsMovieSerializer(movies, many=True)
+        movie_serializer = DisplayMovieSerializer(movies, many=True)
         return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
 
 
@@ -391,3 +478,40 @@ def post_group_movie(request):
         if group_movie_serializer.is_valid():
             group_movie_serializer.save()
             return JsonResponse(group_movie_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+        return JsonResponse(group_movie_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+
+@api_view(['GET'])
+def get_unrated_movies(request, pk):
+    if request.method == 'GET':
+
+        ratings = Rating.objects.filter(user_id=int(pk)).filter(rating__isnull=True).values("movie_id")
+        ratings_null = []
+        for rat in ratings:
+            ratings_null.append(rat['movie_id'])
+        movie_serializer = DisplayMovieSerializer(Movie.objects.filter(movie_id__in=ratings_null), many=True)
+        return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
+
+
+@api_view(['POST'])
+def post_genres(request):
+    if request.method == 'POST':
+        genres = JSONParser().parse(request)
+        genres_serializer = GenreSerializer(data=genres, many=True)
+
+        if genres_serializer.is_valid():
+            genres_serializer.save()
+            return JsonResponse(genres_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+        return JsonResponse(genres_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
+
+
+@api_view(['POST'])
+def post_movies_genres(request):
+    if request.method == 'POST':
+        movies_genres = JSONParser().parse(request)
+        movies_genres_serializer = MovieGenreSerializer(data=movies_genres, many=True)
+
+        if movies_genres_serializer.is_valid():
+            movies_genres_serializer.save()
+            return JsonResponse(movies_genres_serializer.data, status=status.HTTP_201_CREATED, safe=False)
+        return JsonResponse(movies_genres_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)

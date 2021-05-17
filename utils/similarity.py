@@ -1,19 +1,21 @@
-from turtle import pd
-
 import numpy as np
 from scipy.sparse import csr_matrix
 from sklearn.metrics.pairwise import cosine_similarity
 
 
-def get_most_similar_users(user_data, train_data, number):
-    userId = user_data['user_id'].tolist()[0]
-    all_data = pd.concat([train_data, user_data], ignore_index=True, sort=True)
-    train_sparse_matrix = csr_matrix((all_data.rating.values, (all_data.user_id.values, all_data.movie_id.values)))
+def get_most_similar_users(user_id, train_data, number, users=None):
+    train_sparse_matrix = csr_matrix(
+        (train_data.rating.values, (train_data.user_id.values, train_data.movie_id_id.values)))
 
-    user_similarity = np.argsort(cosine_similarity(train_sparse_matrix[userId], train_sparse_matrix).ravel())
+    user_similarity = np.argsort(cosine_similarity(train_sparse_matrix[user_id], train_sparse_matrix).ravel())
 
-    index = np.argwhere(user_similarity == userId)
+    index = np.argwhere(user_similarity == user_id)
     user_similarity = np.delete(user_similarity, index)
+
+    if users:
+        for user_item in users:
+            index = np.argwhere(user_similarity == user_item)
+            user_similarity = np.delete(user_similarity, index)
 
     length_sim = user_similarity.size
     top_sim_users = []
@@ -46,17 +48,20 @@ def take_second(elem):
 
 def get_best_movies_for_new_user(predictions_df, users_ids, number):
     all_movies_average_rating = []
-    movies_unique = predictions_df.movie_id.unique().tolist()
+    movies_unique = predictions_df.movie_id_id.unique().tolist()
 
     data = delete_users_from_ratings(users_ids, predictions_df)
 
     for movieId in movies_unique:
-        all_movies_average_rating.append((movieId, data[data['movie_id'] == movieId].rating.mean()))
+        all_movies_average_rating.append((movieId, data[data['movie_id_id'] == movieId].rating.mean()))
 
     all_movies_average_rating.sort(key=take_second, reverse=True)
     recommendations = []
 
+    if len(all_movies_average_rating) < number:
+        number = len(all_movies_average_rating)
+
     for i in range(number):
-        recommendations.append(all_movies_average_rating[i])
+        recommendations.append(all_movies_average_rating[i][0])
 
     return recommendations
