@@ -1,10 +1,11 @@
 from django.conf.urls import url
 
-from .views import credentials_list, train_data, get_movies, post_predictions, get_prediction, \
-    get_movies_details, rate_movies, get_watched_movies, \
-    add_description_ro, upload_image, image, get_users_details, check_credentials, add_group, add_members, \
-    get_all_group, get_group_movie, post_movies_genres, post_genres, get_group_prediction, get_unrated_movies, \
-    post_group_movie
+from filmdb.views.genre_views import post_genres, post_movies_genres
+from filmdb.views.group_views import add_group, add_members, get_all_group, get_group_movie, post_group_movie
+from filmdb.views.movie_views import get_movies, get_movies_details, rate_movies, get_watched_movies, \
+    add_description_ro, get_unrated_movies
+from filmdb.views.prediction_views import train_data, post_predictions, get_prediction, get_group_prediction
+from filmdb.views.user_views import credentials_list, upload_image, image, get_users_details, check_credentials
 
 urlpatterns = [
     url(r'^credentials$', credentials_list),
