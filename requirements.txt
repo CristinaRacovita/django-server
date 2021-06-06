@@ -76,6 +76,5 @@ uritemplate==3.0.1
 urllib3==1.26.4
 Werkzeug==1.0.1
 whitenoise==5.2.0
-windows-curses==2.2.0
 wrapt==1.12.1
 zipp==3.4.1
