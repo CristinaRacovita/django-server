@@ -1,6 +1,5 @@
 import numpy as np
 import tensorflow as tf
-from sklearn.metrics.pairwise import cosine_similarity
 
 
 def build_sparse_tensor(np_array, indices, shape):

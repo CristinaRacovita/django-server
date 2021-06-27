@@ -12,7 +12,7 @@ from utils.group_election import borda_count
 import pandas as pd
 import numpy as np
 
-from utils.matrix_factorizarion import build_sparse_tensor, MatrixFactorization
+from utils.matrix_factorization import build_sparse_tensor, MatrixFactorization
 from utils.similarity import get_best_movies_for_new_user, get_most_similar_users
 
 NO_OF_SIMILAR_USERS = 12
@@ -49,6 +49,8 @@ def get_group_prediction(request, ids):
                 except ValueError:
                     return JsonResponse("Not a int", status=status.HTTP_400_BAD_REQUEST, safe=False)
 
+        print(ids_arr)
+
         user_movie = Rating.objects.filter(user_id__in=ids_arr)
         ratings = list(user_movie.select_related('movie_id').values('movie_id__movie_id'))
 
@@ -60,6 +62,7 @@ def get_group_prediction(request, ids):
             movie_id__movie_id__in=watched_movies).values()))
 
         movies = borda_count(ids_arr, user_movie.exclude(rating__isnull=True), predictions_df, NO_OF_MOVIES)
+
         movies_dict = []
         for movie_id in movies:
             movie = Movie.objects.get(pk=movie_id)

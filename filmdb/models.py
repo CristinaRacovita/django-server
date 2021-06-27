@@ -93,7 +93,7 @@ class GroupUser(models.Model):
         db_table = 'GroupUser'
 
 
-class GroupUserMovie(models.Model):
+class GroupMovie(models.Model):
     group_movie_id = models.AutoField(primary_key=True)
     group_id = models.ForeignKey(Group, on_delete=models.CASCADE, null=True, db_column='group_id')
     movie_id = models.ForeignKey(Movie, on_delete=models.CASCADE, null=True, db_column='movie_id')

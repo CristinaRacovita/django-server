@@ -3,7 +3,7 @@ from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.parsers import JSONParser
 
-from filmdb.models import GroupUserMovie, GroupUser
+from filmdb.models import GroupMovie, GroupUser
 from filmdb.serializers import GroupMovieSerializer, DisplayMovieSerializer, UserDetailsSerializer, GroupUserSerializer, \
     GroupSerializer
 
@@ -55,7 +55,7 @@ def get_all_group(request, pk):
 @api_view(['GET'])
 def get_group_movie(request, group_id):
     if request.method == 'GET':
-        groups_users = GroupUserMovie.objects.filter(group_id=int(group_id))
+        groups_users = GroupMovie.objects.filter(group_id=int(group_id))
         movies = []
         for group in groups_users:
             movies.append(group.movie_id)

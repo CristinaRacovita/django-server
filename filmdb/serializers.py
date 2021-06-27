@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import User, TrainData, Movie, Rating, Group, GroupUser, GroupUserMovie, Genre, MovieGenre
+from .models import User, TrainData, Movie, Rating, Group, GroupUser, GroupMovie, Genre, MovieGenre
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -133,7 +133,7 @@ class GroupUserSerializer(serializers.ModelSerializer):
 
 class GroupMovieSerializer(serializers.ModelSerializer):
     class Meta:
-        model = GroupUserMovie
+        model = GroupMovie
         fields = ('group_id', 'movie_id', 'group_movie_id')
 
 

@@ -2,15 +2,18 @@ from itertools import chain
 
 import pandas as pd
 
-from filmdb.models import Rating, TrainData
+from filmdb.models import TrainData
 from utils.similarity import delete_users_from_ratings, get_most_similar_users
 
 
-def get_movies_for_user_from_predictions(new_user, predictions):
-    movies = {new_user: []}
-
-    for row, index in predictions[predictions['user_id'] == new_user].iterrows():
-        movies[new_user].append((row['movie_id_id'], row['rating']))
+def get_movies_for_user_from_predictions(old_user, predictions):
+    movies = {old_user: []}
+    print(predictions[predictions['user_id'] == old_user])
+    try:
+        for index, row in predictions[predictions['user_id'] == old_user].iterrows():
+            movies[old_user].append((row['movie_id_id'], row['rating']))
+    except Exception as e:
+        print(e)
 
     return movies
 
@@ -79,12 +82,13 @@ def borda_count(users, user_movie, predictions, no_of_recommendations):
 
 
 def get_movies_for_selected_users(all_dict, predictions, train_data_for_similar, users):
+    print(users)
     for user in users:
         if predictions[predictions['user_id'] == user].empty:
             ids = get_most_similar_users(user, train_data_for_similar, 12, users)
             all_dict.append(get_movies_for_new_user(predictions, user, ids))
         else:
-            all_dict.append(get_movies_for_user_from_predictions(users, predictions))
+            all_dict.append(get_movies_for_user_from_predictions(user, predictions))
     movies = concat_dicts(all_dict)
     return movies
 
