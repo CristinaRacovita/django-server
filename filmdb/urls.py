@@ -3,7 +3,7 @@ from django.conf.urls import url
 from filmdb.views.genre_views import post_genres, post_movies_genres
 from filmdb.views.group_views import add_group, add_members, get_all_group, get_group_movie, post_group_movie
 from filmdb.views.movie_views import get_movies, get_movies_details, rate_movies, get_watched_movies, \
-    add_description_ro, get_unrated_movies
+    get_unrated_movies
 from filmdb.views.prediction_views import train_data, post_predictions, get_prediction, get_group_prediction
 from filmdb.views.user_views import credentials_list, upload_image, image, get_users_details, check_credentials
 
@@ -16,7 +16,6 @@ urlpatterns = [
     url(r'^prediction/(?P<pk>[0-9]+)$', get_prediction),
     url(r'^rateMovies$', rate_movies),
     url(r'^watchedMovies/(?P<pk>[0-9]+)$', get_watched_movies),
-    url(r'^updateDescriptionRo$', add_description_ro),
     url(r'^upload/(?P<pk>[0-9]+)$', upload_image),
     url(r'^image/(?P<pk>[0-9]+)$', image),
     url(r'^users/(?P<ids>[\w\-]+)$', get_users_details),

@@ -6,7 +6,6 @@ from rest_framework.parsers import JSONParser
 from filmdb.models import Movie, Rating
 from filmdb.serializers import MovieSerializer, WatchedMovieSerializer, RatingSerializer, DetailsMovieSerializer, \
     DisplayMovieSerializer
-from filmdb.translation import translate_in_romanian
 
 
 @api_view(['GET', 'POST'])
@@ -76,30 +75,6 @@ def get_watched_movies(request, pk):
             if movie_serializer.is_valid():
                 return JsonResponse(movie_serializer.data, status=status.HTTP_200_OK, safe=False)
             return JsonResponse(movie_serializer.errors, status=status.HTTP_400_BAD_REQUEST, safe=False)
-        except Exception as e:
-            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['PUT'])
-def add_description_ro(request):
-    if request.method == 'PUT':
-        movies = Movie.objects.all()
-
-        try:
-            for movie in movies:
-                if movie.description_ro is None and movie.movie_title:
-                    print(movie.movie_title)
-                    description_ro = translate_in_romanian(movie.description_en)
-                    movie.description_ro = description_ro
-
-                    movie.save()
-
-        except Exception as e:
-            return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            return JsonResponse("Done.", status=status.HTTP_201_CREATED,
-                                safe=False)
         except Exception as e:
             return JsonResponse({'error': e.args[0]}, status=status.HTTP_400_BAD_REQUEST)
 

@@ -15,7 +15,6 @@ class Movie(models.Model):
     release_year = models.IntegerField()
     image_url = models.CharField(max_length=250, null=True)
     description_en = models.CharField(max_length=1000, null=True)
-    description_ro = models.CharField(max_length=1500, null=True)
 
     class Meta:
         db_table = 'Movie'

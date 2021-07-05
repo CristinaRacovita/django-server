@@ -27,7 +27,6 @@ class TrainDataSerializer(serializers.ModelSerializer):
 
 class DisplayMovieSerializer(serializers.ModelSerializer):
     class Meta:
-
         model = Movie
         fields = ['movie_id', 'movie_title']
         extra_kwargs = {
@@ -39,10 +38,6 @@ class DisplayMovieSerializer(serializers.ModelSerializer):
                 'required': False,
                 'allow_blank': True,
             },
-            'description_ro': {
-                'required': False,
-                'allow_blank': True,
-            }
         }
 
 
@@ -71,10 +66,6 @@ class MovieSerializer(serializers.ModelSerializer):
                 'required': False,
                 'allow_blank': True,
             },
-            'description_ro': {
-                'required': False,
-                'allow_blank': True,
-            }
         }
 
 
