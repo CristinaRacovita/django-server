@@ -210,8 +210,8 @@ def training_process(data):
     indices = [[i, j] for i in range(R.shape[0]) for j in range(R.shape[1]) if R[i, j] > 0]
     shape = R.shape
     R = build_sparse_tensor(np.array(data.rating, dtype=np.float32), indices, shape)
-    mf = MatrixFactorization(R, latent_features=20)
-    mf.train(alpha=0.0003, iterations=50000, beta=0.0001)
+    mf = MatrixFactorization(R, latent_features=10)
+    mf.train(alpha=0.005, iterations=50000, beta=0.0003)
     print()
     print("P x Q:")
     print(mf.full_matrix())

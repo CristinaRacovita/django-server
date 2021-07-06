@@ -30,7 +30,7 @@ class MatrixFactorization:
             loss_mse = lambda: tf.reduce_sum(tf.losses.mean_squared_error(self.data.values,
                                                                           tf.gather_nd(tf.matmul(self.P, self.Q),
                                                                                        self.data.indices))) + \
-                               self.regularization(beta)
+                               self.regularization_l1(beta)
 
             optimizer.minimize(loss_mse, var_list=[self.P, self.Q])
 
@@ -46,7 +46,15 @@ class MatrixFactorization:
             if (i + 1) % 25 == 0:
                 print("Iteration: %d ; error = %.4f; " % (i + 1, mse))
 
-    def regularization(self, beta):
+    def regularization_l1(self, beta):
+        abs_P = tf.abs(self.P)
+        abs_Q = tf.abs(self.Q)
+        sum_P = tf.reduce_sum(abs_P)
+        sum_Q = tf.reduce_sum(abs_Q)
+
+        return (sum_Q + sum_P) * beta
+
+    def regularization_l2(self, beta):
         pow_P = tf.pow(self.P, 2)
         pow_Q = tf.pow(self.Q, 2)
         sum_P = tf.reduce_sum(pow_P)
